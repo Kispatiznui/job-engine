@@ -10,6 +10,7 @@ from sources.themuse import fetch as themuse
 from core.scorer import calculate_score
 from core.filters import is_excluded, domain_penalty
 from core.exporter import load_existing, save_jobs
+from core.recruiter_ai import ai_recruiter
 
 # -----------------------
 # CONFIG
@@ -28,7 +29,6 @@ existing = load_existing()
 # FETCH ALL SOURCES
 # -----------------------
 jobs = []
-
 jobs += remoteok()
 jobs += remotive()
 jobs += arbeitnow()
@@ -39,50 +39,83 @@ jobs += themuse()
 print(f"📦 Total jobs raw: {len(jobs)}")
 
 # -----------------------
+# BUCKETS (NO SE BORRA NADA)
+# -----------------------
+top = []
+mid = []
+noise = []
+
+processed_jobs = []
+
+# -----------------------
 # PROCESSING
 # -----------------------
-final_jobs = []
-
 for job in jobs:
     text = f"{job['titulo']} {job['empresa']}"
 
+    # filtro suave (solo evita basura configurada)
     if is_excluded(text, exclude):
         continue
 
-    base_score = calculate_score(text)
-    base_score += domain_penalty(text)
+    # SCORE BASE
+    score = calculate_score(text)
+    score += domain_penalty(text)
 
-    source = job.get("source", "unknown")
+    job["score"] = round(score, 2)
 
-    weight = source_weight.get(source, 1.0)
+    # DECISIÓN IA RECRUITER
+    decision = ai_recruiter(text, score)
 
-    final_score = base_score * weight
+    job["decision"] = decision["decision"]
+    job["reason"] = decision["reason"]
+    job["bucket"] = decision["bucket"]
 
-    job["score"] = round(final_score, 2)
-
+    # evitar duplicados
     if job["titulo"] in existing:
         continue
 
-    if final_score >= 1:
-        final_jobs.append(job)
+    # -----------------------
+    # CLASIFICACIÓN
+    # -----------------------
+    if decision["bucket"] == "top":
+        top.append(job)
+    elif decision["bucket"] == "mid":
+        mid.append(job)
+    else:
+        noise.append(job)
+
+    processed_jobs.append(job)
 
 # -----------------------
-# SORT
+# ORDENAR POR SCORE
 # -----------------------
-final_jobs.sort(key=lambda x: x["score"], reverse=True)
+top.sort(key=lambda x: x["score"], reverse=True)
+mid.sort(key=lambda x: x["score"], reverse=True)
+noise.sort(key=lambda x: x["score"], reverse=True)
 
 # -----------------------
-# SAVE
+# GUARDAR TODO (INCLUYE RUIDO)
 # -----------------------
-save_jobs(final_jobs)
+save_jobs(processed_jobs)
 
 # -----------------------
 # OUTPUT
 # -----------------------
-print("\n🔥 TOP JOBS\n")
-
-for j in final_jobs[:25]:
+print("\n🔥 APLICAR (TOP JOBS)\n")
+for j in top[:20]:
     print(f"{j['empresa']} - {j['titulo']} | {j['score']}")
+    print(f"DECISIÓN: {j['decision']} | {j['reason']}")
     print(j["url"])
-    print(f"[{j['source']}]")
+    print()
+
+print("\n🟡 TAL VEZ\n")
+for j in mid[:20]:
+    print(f"{j['empresa']} - {j['titulo']} | {j['score']}")
+    print(f"DECISIÓN: {j['decision']} | {j['reason']}")
+    print()
+
+print("\n⚪ RUIDO (NO BORRADO, SOLO SEPARADO)\n")
+for j in noise[:20]:
+    print(f"{j['empresa']} - {j['titulo']}")
+    print(f"DECISIÓN: {j['decision']}")
     print()
