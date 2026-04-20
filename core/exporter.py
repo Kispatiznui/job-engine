@@ -25,6 +25,36 @@ def save_jobs(jobs):
     with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
+        # 👇 HEADER COMPLETO NUEVO
+        if not file_exists:
+            writer.writerow([
+                "empresa",
+                "titulo",
+                "url",
+                "score",
+                "decision",
+                "bucket",
+                "reason",
+                "source"
+            ])
+
+        for j in jobs:
+            writer.writerow([
+                j.get("empresa", ""),
+                j.get("titulo", ""),
+                j.get("url", ""),
+                j.get("score", 0),
+                j.get("decision", ""),
+                j.get("bucket", ""),
+                j.get("reason", ""),
+                j.get("source", "")
+            ])
+def save_jobs(jobs):
+    file_exists = os.path.exists(CSV_PATH)
+
+    with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+
         if not file_exists:
             writer.writerow(["empresa", "titulo", "url", "score", "source"])
 
