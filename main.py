@@ -49,15 +49,21 @@ for job in jobs:
     if is_excluded(text, exclude):
         continue
 
-    score = calculate_score(text)
-    score += domain_penalty(text)
+    base_score = calculate_score(text)
+    base_score += domain_penalty(text)
 
-    job["score"] = score
+    source = job.get("source", "unknown")
+
+    weight = source_weight.get(source, 1.0)
+
+    final_score = base_score * weight
+
+    job["score"] = round(final_score, 2)
 
     if job["titulo"] in existing:
         continue
 
-    if score >= 1:
+    if final_score >= 1:
         final_jobs.append(job)
 
 # -----------------------
